@@ -1,2 +1,0 @@
-# HexBattler
-Initial commit
