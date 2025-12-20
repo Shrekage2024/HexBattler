@@ -5,7 +5,15 @@ import { HexBoard } from '@/components/HexBoard';
 import { PageContainer } from '@/components/PageContainer';
 import { useAnonymousAuth } from '@/hooks/useAnonymousAuth';
 import { joinGame, listenToGame, listenToPlayers, startGame } from '@/lib/firestore';
-import type { GameState, LocalMovePreview, PlayerState } from '@/types/game';
+import type { AxialCoord, GameState, PlayerState } from '@/types/game';
+import {
+  applyMove,
+  demoAdvanceCard,
+  directionLabels,
+  getLegalActions,
+  type Direction,
+  type EnginePiece,
+} from '@/engine';
 
 const colors = ['#38bdf8', '#f472b6', '#c084fc', '#f59e0b'];
 
@@ -14,9 +22,16 @@ export const GamePage = () => {
   const { user } = useAnonymousAuth();
   const [game, setGame] = useState<GameState | null>(null);
   const [players, setPlayers] = useState<PlayerState[]>([]);
-  const [selectedPieceId, setSelectedPieceId] = useState<string | undefined>();
-  const [preview, setPreview] = useState<LocalMovePreview | null>(null);
   const navigate = useNavigate();
+  const boardRadius = game?.boardRadius ?? 3;
+
+  const [piece, setPiece] = useState<EnginePiece>({
+    id: 'demo-piece',
+    position: { q: 0, r: 0 },
+    facing: 0,
+  });
+  const [planningCardId, setPlanningCardId] = useState<string | null>(null);
+  const [chosenFacing, setChosenFacing] = useState<Direction | null>(null);
 
   useEffect(() => {
     if (!gameId || !user) return;
@@ -43,26 +58,43 @@ export const GamePage = () => {
   }, [gameId]);
 
   const inviteLink = useMemo(() => (gameId ? `${window.location.origin}/game/${gameId}` : ''), [gameId]);
-  const currentPlayerPiece = useMemo(
-    () => game?.pieces.find((piece) => piece.ownerId === user?.uid),
-    [game?.pieces, user?.uid]
+
+  const planningActions = useMemo(
+    () =>
+      getLegalActions({
+        piece,
+        card: demoAdvanceCard,
+        boardRadius,
+        chosenFacing: chosenFacing ?? undefined,
+      }),
+    [boardRadius, chosenFacing, piece]
   );
 
-  const handleSelect = (pieceId: string) => {
-    setSelectedPieceId(pieceId);
-    const piece = game?.pieces.find((p) => p.id === pieceId);
-    if (!piece) return;
-    const next: LocalMovePreview = {
-      pieceId,
-      from: piece.position,
-      to: { q: piece.position.q + 1, r: piece.position.r },
-    };
-    setPreview(next);
+  const beginPlanning = () => {
+    setPlanningCardId(demoAdvanceCard.id);
+    setChosenFacing(null);
   };
 
-  const handleStartGame = () => {
-    if (gameId) startGame(gameId);
+  const handleSelectFacing = (direction: Direction) => {
+    setChosenFacing(direction);
   };
+
+  const handleApplyMove = (destination: AxialCoord) => {
+    if (chosenFacing === null) return;
+    setPiece((current) =>
+      applyMove({
+        piece: current,
+        destination,
+        facing: chosenFacing,
+      })
+    );
+    setPlanningCardId(null);
+    setChosenFacing(null);
+  };
+
+  const isPlanning = planningCardId === demoAdvanceCard.id;
+  const destinationOptions = isPlanning && chosenFacing !== null ? planningActions.moveDestinations : [];
+  const showFacingOptions = isPlanning && chosenFacing === null;
 
   if (!gameId) return null;
 
@@ -90,29 +122,80 @@ export const GamePage = () => {
         </div>
       }
     >
-      {game ? (
-        <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-          <div className="space-y-4">
-            {game.phase === 'lobby' ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-                <p className="text-sm text-slate-300">Waiting for players… share the link to invite others.</p>
-              </div>
-            ) : (
-              <HexBoard
-                radius={game.boardRadius}
-                pieces={game.pieces}
-                selectedPieceId={selectedPieceId ?? currentPlayerPiece?.id}
-                onSelectPiece={handleSelect}
-                previewMove={preview}
-              />
-            )}
-          </div>
-
-          <aside className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Lobby</h2>
-              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">{game.phase}</span>
+      <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
+        <div className="space-y-4">
+          {game?.phase === 'lobby' && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-300">
+              Waiting for players… the local demo board below stays interactive.
             </div>
+          )}
+          <HexBoard
+            radius={boardRadius}
+            pieces={[{ id: piece.id, ownerId: 'local', position: piece.position, label: 'A', facing: piece.facing }]}
+            selectedPieceId={piece.id}
+            highlightedHexes={destinationOptions}
+            onHexClick={handleApplyMove}
+          />
+
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Card Tray</p>
+                <p className="text-xs text-slate-400">Select a card to plan a move.</p>
+              </div>
+              <span className="rounded-full bg-slate-800 px-2 py-1 text-[10px] uppercase text-slate-300">Demo</span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className={
+                  isPlanning
+                    ? 'rounded-xl border border-emerald-400 bg-emerald-500/20 px-4 py-3 text-left text-sm font-semibold text-emerald-200'
+                    : 'rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-3 text-left text-sm font-semibold text-slate-100'
+                }
+                onClick={beginPlanning}
+              >
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Move</div>
+                <div className="text-lg text-white">Advance</div>
+                <div className="mt-2 text-xs text-slate-400">Move F 2 · Rotate ±1</div>
+              </button>
+            </div>
+            {showFacingOptions && (
+              <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Choose facing</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {planningActions.facingOptions.map((direction) => (
+                    <button
+                      key={direction}
+                      type="button"
+                      onClick={() => handleSelectFacing(direction)}
+                      className="rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2 text-xs font-semibold text-slate-100"
+                    >
+                      {directionLabels[direction]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {isPlanning && chosenFacing !== null && (
+              <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                <p className="text-xs text-slate-400">
+                  Click a highlighted hex to move. Facing:{' '}
+                  <span className="text-emerald-300">{directionLabels[chosenFacing]}</span>
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <aside className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Lobby</h2>
+            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+              {game?.phase ?? 'local'}
+            </span>
+          </div>
+          {game ? (
             <ul className="mt-4 space-y-3">
               {players.map((player) => (
                 <li
@@ -140,16 +223,18 @@ export const GamePage = () => {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 text-xs text-slate-400">
-              Invite link: <span className="text-emerald-300">{inviteLink}</span>
-            </div>
-          </aside>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 text-slate-300">
-          Loading game data…
-        </div>
-      )}
+          ) : (
+            <p className="mt-4 text-sm text-slate-400">Local demo mode: Firebase data is unavailable.</p>
+          )}
+          <div className="mt-4 text-xs text-slate-400">
+            Invite link: <span className="text-emerald-300">{inviteLink}</span>
+          </div>
+        </aside>
+      </div>
     </PageContainer>
   );
+
+  function handleStartGame() {
+    if (gameId) startGame(gameId);
+  }
 };
