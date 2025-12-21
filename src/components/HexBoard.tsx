@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { AxialCoord, Piece } from '@/types/game';
 import { directionVectors } from '@/engine';
+import { axialToPixel, boardViewBox, hexPolygonPoints, makeHexagonDisk } from '@/lib/geometry';
 
 interface HexBoardProps {
   radius: number;
@@ -10,31 +11,17 @@ interface HexBoardProps {
   previewMove?: { pieceId: string; to: AxialCoord } | null;
   highlightedHexes?: AxialCoord[];
   onHexClick?: (hex: AxialCoord) => void;
+  selectedCell?: AxialCoord | null;
+  highlightedCells?: Set<string> | string[];
+  onCellClick?: (cell: AxialCoord) => void;
+  className?: string;
 }
-
-const axialToPixel = (q: number, r: number, size = 36) => {
-  const x = size * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r);
-  const y = size * ((3 / 2) * r);
-  return { x, y };
-};
-
-const buildHexes = (radius: number) => {
-  const hexes: AxialCoord[] = [];
-  for (let q = -radius; q <= radius; q += 1) {
-    const r1 = Math.max(-radius, -q - radius);
-    const r2 = Math.min(radius, -q + radius);
-    for (let r = r1; r <= r2; r += 1) {
-      hexes.push({ q, r });
-    }
-  }
-  return hexes;
-};
 
 const getDirectionVector = (facing: number) => directionVectors[((facing % 6) + 6) % 6];
 
 const arrowPoints = (facing: number, size: number) => {
   const direction = getDirectionVector(facing);
-  const { x: dx, y: dy } = axialToPixel(direction.q, direction.r, size);
+  const { x: dx, y: dy } = axialToPixel({ q: direction.q, r: direction.r }, size);
   const length = Math.hypot(dx, dy);
   if (length === 0) return null;
   const ux = dx / length;
@@ -64,36 +51,62 @@ export const HexBoard = ({
   previewMove,
   highlightedHexes,
   onHexClick,
+  selectedCell,
+  highlightedCells,
+  onCellClick,
+  className,
 }: HexBoardProps) => {
-  const hexes = useMemo(() => buildHexes(radius), [radius]);
-  const size = 36;
+  const hexes = useMemo(() => makeHexagonDisk(radius), [radius]);
+  const hexSize = 30;
+  const polygonPoints = useMemo(() => hexPolygonPoints(hexSize), [hexSize]);
+  const viewBox = useMemo(() => boardViewBox(radius, hexSize, 40), [radius, hexSize]);
+  const cellKey = (q: number, r: number) => `${q},${r}`;
   const highlightLookup = useMemo(() => {
-    return new Set((highlightedHexes ?? []).map((hex) => `${hex.q},${hex.r}`));
+    return new Set((highlightedHexes ?? []).map((hex) => cellKey(hex.q, hex.r)));
   }, [highlightedHexes]);
+  const highlightedCellSet = useMemo(() => {
+    if (!highlightedCells) return new Set<string>();
+    if (highlightedCells instanceof Set) return highlightedCells;
+    return new Set(highlightedCells);
+  }, [highlightedCells]);
+
+  const containerClassName =
+    className ??
+    'relative mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 p-6';
 
   return (
-    <div className="relative mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-      <svg viewBox="-240 -200 480 400" className="w-full">
+    <div className={containerClassName}>
+      <svg viewBox={viewBox} className="w-full">
         {hexes.map(({ q, r }) => {
-          const { x, y } = axialToPixel(q, r, size * 0.6);
-          const isHighlighted = highlightLookup.has(`${q},${r}`);
+          const { x, y } = axialToPixel({ q, r }, hexSize);
+          const key = cellKey(q, r);
+          const isHighlighted = highlightLookup.has(key);
+          const isSoftHighlighted = highlightedCellSet.has(key);
+          const isSelected = selectedCell?.q === q && selectedCell?.r === r;
+          const canClick = Boolean(onCellClick) || (isHighlighted && Boolean(onHexClick));
+          const handleCellClick = () => {
+            onCellClick?.({ q, r });
+            if (isHighlighted) onHexClick?.({ q, r });
+          };
           return (
-            <g key={`${q},${r}`} transform={`translate(${x}, ${y})`}>
+            <g key={key} transform={`translate(${x}, ${y})`}>
               <polygon
-                points="32,0 16,27.7 -16,27.7 -32,0 -16,-27.7 16,-27.7"
-                className={
+                points={polygonPoints}
+                className={`${canClick ? 'cursor-pointer' : ''} ${
                   isHighlighted
                     ? 'fill-emerald-500/30 stroke-emerald-300/70'
+                    : isSoftHighlighted
+                    ? 'fill-emerald-400/15 stroke-emerald-200/50'
                     : 'fill-slate-800 stroke-slate-700'
-                }
+                }`}
                 strokeWidth="1.5"
-                onClick={isHighlighted ? () => onHexClick?.({ q, r }) : undefined}
+                onClick={canClick ? handleCellClick : undefined}
               />
-              {isHighlighted && (
+              {isSelected && (
                 <polygon
-                  points="32,0 16,27.7 -16,27.7 -32,0 -16,-27.7 16,-27.7"
-                  className="cursor-pointer fill-transparent"
-                  onClick={() => onHexClick?.({ q, r })}
+                  points={polygonPoints}
+                  className="fill-transparent stroke-emerald-200/80"
+                  strokeWidth="2.5"
                 />
               )}
               <text className="fill-slate-500 text-[10px]" textAnchor="middle" dy="4">
@@ -106,9 +119,9 @@ export const HexBoard = ({
         {pieces.map((piece) => {
           const moveTarget = previewMove?.pieceId === piece.id ? previewMove.to : null;
           const targetPosition = moveTarget ?? piece.position;
-          const { x, y } = axialToPixel(targetPosition.q, targetPosition.r, size * 0.6);
+          const { x, y } = axialToPixel({ q: targetPosition.q, r: targetPosition.r }, hexSize);
           const isSelected = piece.id === selectedPieceId;
-          const arrow = piece.facing === undefined ? null : arrowPoints(piece.facing, size * 0.6);
+          const arrow = piece.facing === undefined ? null : arrowPoints(piece.facing, hexSize);
 
           return (
             <g key={piece.id} transform={`translate(${x}, ${y})`}>
