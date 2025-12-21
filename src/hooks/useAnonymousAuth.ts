@@ -2,28 +2,38 @@ import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { ensureAnonymousUser, isFirebaseConfigured, onAuthChanged } from '@/lib/firebase';
 
-export const useAnonymousAuth = () => {
+type UseAnonymousAuthResult = {
+  user: User | null;
+  loading: boolean;
+};
+
+export const useAnonymousAuth = (): UseAnonymousAuthResult => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(isFirebaseConfigured);
 
   useEffect(() => {
-    if (!isFirebaseConfigured) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    if (!isFirebaseConfigured) return;
+
+    let cancelled = false;
+
+    // Start anonymous sign-in; do not set state synchronously in effect body.
+    ensureAnonymousUser()
+      .catch(() => {
+        // Stop loading if auth bootstrap fails (async callback is fine).
+        if (!cancelled) setLoading(false);
+      });
+
     const unsubscribe = onAuthChanged((nextUser) => {
+      if (cancelled) return;
       setUser(nextUser);
       setLoading(false);
     });
 
-    ensureAnonymousUser().catch((error) => {
-      console.error('Failed to sign in anonymously', error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
-  return { user, loading } as const;
+  return { user, loading };
 };

@@ -16,13 +16,22 @@ const axialDistance = (a: Axial, b: Axial) => {
 
 export const HexBoardPanel = ({ radius = 3 }: HexBoardPanelProps) => {
   const [selectedCell, setSelectedCell] = useState<Axial | null>(null);
+
   const hexes = useMemo(() => makeHexagonDisk(radius), [radius]);
-  const center = { q: 0, r: 0 };
-  const coreCells = useMemo(() => hexes.filter((cell) => axialDistance(cell, center) <= 1), [hexes]);
+
+  // Make center stable so useMemo deps are correct (prevents react-hooks/exhaustive-deps warning)
+  const center = useMemo<Axial>(() => ({ q: 0, r: 0 }), []);
+
+  const coreCells = useMemo(() => {
+    return hexes.filter((cell) => axialDistance(cell, center) <= 1);
+  }, [hexes, center]);
+
   const highlightedCells = useMemo(() => {
     if (!selectedCell) return new Set<string>();
     return new Set(
-      hexes.filter((cell) => axialDistance(cell, selectedCell) === 1).map((cell) => axialKey(cell))
+      hexes
+        .filter((cell) => axialDistance(cell, selectedCell) === 1)
+        .map((cell) => axialKey(cell))
     );
   }, [hexes, selectedCell]);
 
@@ -50,8 +59,8 @@ export const HexBoardPanel = ({ radius = 3 }: HexBoardPanelProps) => {
         />
       </div>
 
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_20%,rgba(45,212,191,0.08),transparent_45%)]" />
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_60%,rgba(52,211,153,0.12),transparent_55%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(45,212,191,0.08),transparent_45%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_60%,rgba(52,211,153,0.12),transparent_55%)]" />
     </section>
   );
 };
