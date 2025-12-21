@@ -1,8 +1,5 @@
-import type { Card } from './types';
-import { parseCard } from './schema';
-
-export const sampleCards: Card[] = [
-  parseCard({
+export const sampleCardData: unknown[] = [
+  {
     id: 'ability-frostline',
     cardType: 'ability',
     name: 'Frostline Lunge',
@@ -10,7 +7,7 @@ export const sampleCards: Card[] = [
     rotationAllowance: 1,
     damage: 3,
     knockbackFactor: 2,
-    activeText: 'After moving, you may rotate 60° toward a target.',
+    activeText: 'After moving, you may rotate 60 deg toward a target.',
     passiveText: 'If the attack hits, gain 1 guard.',
     timeline: [
       {
@@ -34,11 +31,12 @@ export const sampleCards: Card[] = [
               inner: { id: 'BLOCK', params: { edge: 'F' } },
             },
           },
+          { id: 'TEXT_PASSIVE' },
         ],
       },
     ],
-  }),
-  parseCard({
+  },
+  {
     id: 'movement-veilstep',
     cardType: 'movement',
     name: 'Veil Step',
@@ -62,8 +60,8 @@ export const sampleCards: Card[] = [
         symbols: [{ id: 'TEXT_ACTIVE' }],
       },
     ],
-  }),
-  parseCard({
+  },
+  {
     id: 'rotation-pivot',
     cardType: 'rotation',
     name: 'Pivot Spiral',
@@ -87,5 +85,5 @@ export const sampleCards: Card[] = [
         symbols: [{ id: 'REFRESH' }],
       },
     ],
-  }),
+  },
 ];

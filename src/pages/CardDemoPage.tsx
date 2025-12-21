@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import type { Card } from '@/cards/types';
-import { sampleCards } from '@/cards/sampleContent';
+import { sampleCardData } from '@/cards/sampleContent';
+import { formatValidationErrors, parseCards } from '@/cards/schema';
 import { CardView } from '@/components/CardView/CardView';
 
 const opponentHandCount = 5;
+const parsedSamples = parseCards(sampleCardData);
+
+if (!parsedSamples.success) {
+  const errorMessage = formatValidationErrors(parsedSamples.errors);
+  if (import.meta.env.DEV) {
+    throw new Error(`[CardDemo] Invalid sample card data:\n${errorMessage}`);
+  } else {
+    console.error(`[CardDemo] Invalid sample card data:\n${errorMessage}`);
+  }
+}
+
+const demoCards = parsedSamples.success ? parsedSamples.value : [];
 
 export const CardDemoPage = () => {
-  const [selectedCard, setSelectedCard] = useState<Card>(sampleCards[0]);
+  const [selectedCard, setSelectedCard] = useState<Card>(demoCards[0]);
 
   return (
     <div className="min-h-screen bg-[#0b111e] px-6 py-10 text-slate-100">
@@ -44,13 +57,13 @@ export const CardDemoPage = () => {
             </div>
           </div>
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-            {sampleCards.map((card) => (
+            {demoCards.map((card) => (
               <button
                 key={card.id}
                 type="button"
                 onClick={() => setSelectedCard(card)}
                 className={`min-w-[160px] rounded-xl border p-3 text-left transition ${
-                  selectedCard.id === card.id
+                  selectedCard?.id === card.id
                     ? 'border-emerald-400/60 bg-emerald-500/10'
                     : 'border-white/10 bg-slate-950/40 hover:border-emerald-300/40'
                 }`}
@@ -62,7 +75,7 @@ export const CardDemoPage = () => {
                     PRI {card.priority}
                   </span>
                   <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-indigo-200">
-                    ROT ±{card.rotationAllowance}
+                    ROT +/-{card.rotationAllowance}
                   </span>
                 </div>
               </button>
@@ -70,7 +83,7 @@ export const CardDemoPage = () => {
           </div>
         </section>
 
-        <CardView card={selectedCard} />
+        {selectedCard ? <CardView card={selectedCard} /> : null}
       </div>
     </div>
   );
