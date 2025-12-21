@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { PageContainer } from '@/components/PageContainer';
 import { useAnonymousAuth } from '@/hooks/useAnonymousAuth';
 import { createGame } from '@/lib/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseConfigured } from '@/lib/firebase';
 import type { GameState } from '@/types/game';
 
 export const HomePage = () => {
@@ -14,7 +14,7 @@ export const HomePage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const q = query(collection(db, 'games'), where('playerOrder', 'array-contains', user.uid));
     return onSnapshot(q, (snapshot) => {
       const nextGames: GameState[] = snapshot.docs.map((doc) => ({
@@ -34,7 +34,7 @@ export const HomePage = () => {
   const sortedGames = useMemo(() => games.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)), [games]);
 
   const handleCreateGame = async () => {
-    if (!user) return;
+    if (!user || !isFirebaseConfigured) return;
     const gameId = await createGame(user.uid, displayName || 'Player');
     navigate(`/game/${gameId}`);
   };

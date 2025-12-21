@@ -13,7 +13,7 @@ import {
 import { db } from './firebase';
 import type { GameState, Piece, PlayerState } from '@/types/game';
 
-const gameCollection = collection(db, 'games');
+const gameCollection = db ? collection(db, 'games') : null;
 
 export const defaultPieceForPlayer = (playerId: string, index: number): Piece => ({
   id: `${playerId}-piece`,
@@ -23,6 +23,9 @@ export const defaultPieceForPlayer = (playerId: string, index: number): Piece =>
 });
 
 export const createGame = async (hostId: string, hostName: string): Promise<string> => {
+  if (!db || !gameCollection) {
+    throw new Error('Firebase is not configured');
+  }
   const newGame = await addDoc(gameCollection, {
     hostId,
     phase: 'lobby',
@@ -46,6 +49,9 @@ export const createGame = async (hostId: string, hostName: string): Promise<stri
 };
 
 export const joinGame = async (gameId: string, player: PlayerState) => {
+  if (!db) {
+    throw new Error('Firebase is not configured');
+  }
   const playerRef = doc(db, 'games', gameId, 'players', player.id);
   await setDoc(playerRef, {
     ...player,
@@ -66,10 +72,19 @@ export const joinGame = async (gameId: string, player: PlayerState) => {
   }
 };
 
-export const startGame = (gameId: string) => updateDoc(doc(db, 'games', gameId), { phase: 'playing' });
+export const startGame = (gameId: string) => {
+  if (!db) {
+    throw new Error('Firebase is not configured');
+  }
+  return updateDoc(doc(db, 'games', gameId), { phase: 'playing' });
+};
 
-export const listenToGame = (gameId: string, callback: (state: GameState | null) => void): Unsubscribe =>
-  onSnapshot(doc(db, 'games', gameId), (snap) => {
+export const listenToGame = (gameId: string, callback: (state: GameState | null) => void): Unsubscribe => {
+  if (!db) {
+    callback(null);
+    return () => {};
+  }
+  return onSnapshot(doc(db, 'games', gameId), (snap) => {
     if (!snap.exists()) return callback(null);
     const data = snap.data();
     callback({
@@ -83,15 +98,21 @@ export const listenToGame = (gameId: string, callback: (state: GameState | null)
       createdAt: data.createdAt?.toMillis?.() ?? undefined,
     });
   });
+};
 
 export const listenToPlayers = (
   gameId: string,
   callback: (players: PlayerState[]) => void
-): Unsubscribe =>
-  onSnapshot(collection(db, 'games', gameId, 'players'), (snap) => {
+): Unsubscribe => {
+  if (!db) {
+    callback([]);
+    return () => {};
+  }
+  return onSnapshot(collection(db, 'games', gameId, 'players'), (snap) => {
     const players: PlayerState[] = snap.docs.map((docSnap) => ({
       ...(docSnap.data() as PlayerState),
       id: docSnap.id,
     }));
     callback(players);
   });
+};

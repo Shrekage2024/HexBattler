@@ -1,6 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, type User, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -11,20 +11,33 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const getFirebaseApp = (): FirebaseApp => {
+const hasFirebaseConfig = Object.values(firebaseConfig).every((value) => Boolean(value));
+
+export const getFirebaseApp = (): FirebaseApp | null => {
+  if (!hasFirebaseConfig) return null;
   if (!getApps().length) {
     initializeApp(firebaseConfig);
   }
-  return getApps()[0]!;
+  return getApps()[0] ?? null;
 };
 
-export const auth = getAuth(getFirebaseApp());
-export const db = getFirestore(getFirebaseApp());
+const firebaseApp = getFirebaseApp();
 
-export const ensureAnonymousUser = async (): Promise<User> => {
+export const auth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
+export const db: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
+export const isFirebaseConfigured = hasFirebaseConfig;
+
+export const ensureAnonymousUser = async (): Promise<User | null> => {
+  if (!auth) return null;
   if (auth.currentUser) return auth.currentUser;
   const { user } = await signInAnonymously(auth);
   return user;
 };
 
-export const onAuthChanged = (callback: (user: User | null) => void) => onAuthStateChanged(auth, callback);
+export const onAuthChanged = (callback: (user: User | null) => void) => {
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, callback);
+};
