@@ -1,15 +1,5 @@
-import type {
-  AttackParams,
-  BlockParams,
-  Direction,
-  MoveParams,
-  SymbolId,
-  SymbolInstance,
-  SymbolInstanceBase,
-  WithTextParams,
-} from './symbols';
 import { isSymbolId } from './symbols';
-import type { Card, CardBase, CardType, Frame } from './types';
+import type { Card, CardBase, CardType, Frame, SymbolInstance } from './types';
 
 export type ValidationError = {
   cardId: string;
@@ -35,69 +25,28 @@ const getType = (value: unknown) => {
   return typeof value;
 };
 
-const directions: Direction[] = ['F', 'FL', 'FR', 'B', 'BL', 'BR'];
-const attackPatterns: AttackParams['pattern'][] = ['frontArc', 'adjacent', 'custom'];
-
 const addError = (errors: ValidationError[], cardId: string, path: string, expected: string, value: unknown) => {
   errors.push({ cardId, path, expected, received: getType(value) });
 };
 
-const isDirection = (value: unknown): value is Direction => isString(value) && directions.includes(value as Direction);
-
-const isMoveParams = (value: unknown): value is MoveParams =>
-  isObject(value) && isDirection(value.direction) && isNumber(value.distance);
-
-const isBlockParams = (value: unknown): value is BlockParams => isObject(value) && isDirection(value.edge);
-
-const isAttackParams = (value: unknown): value is AttackParams => {
-  if (!isObject(value) || !isString(value.pattern) || !attackPatterns.includes(value.pattern as AttackParams['pattern'])) {
-    return false;
-  }
-  if (value.offsets === undefined) return true;
-  if (!Array.isArray(value.offsets)) return false;
-  return value.offsets.every(
-    (offset) => isObject(offset) && isNumber(offset.q) && isNumber(offset.r)
+const validateSymbolParams = (params: unknown): boolean => {
+  if (params === undefined) return true;
+  if (!isObject(params)) return false;
+  return Object.values(params).every(
+    (value) => isString(value) || isNumber(value) || typeof value === 'boolean'
   );
 };
 
-const validateSymbolParams = (id: SymbolId, params: unknown): boolean => {
-  switch (id) {
-    case 'WAIT':
-    case 'TEXT_ACTIVE':
-    case 'TEXT_PASSIVE':
-    case 'CONCENTRATION':
-    case 'COMBO':
-    case 'REFRESH':
-      return params === undefined;
-    case 'MOVE':
-    case 'JUMP':
-      return isMoveParams(params);
-    case 'ATTACK':
-    case 'CHARGE':
-      return isAttackParams(params);
-    case 'BLOCK':
-      return isBlockParams(params);
-    case 'WITH_TEXT':
-      return isWithTextParams(params);
-    default:
-      return false;
-  }
-};
-
-const isBaseSymbolInstance = (value: unknown): value is SymbolInstanceBase => {
-  if (!isObject(value) || !isString(value.id) || !isSymbolId(value.id)) return false;
-  if (value.id === 'WITH_TEXT') return false;
-  return validateSymbolParams(value.id, value.params);
-};
-
-const isWithTextParams = (value: unknown): value is WithTextParams =>
-  isObject(value) &&
-  (value.kind === 'active' || value.kind === 'passive') &&
-  isBaseSymbolInstance(value.inner);
-
 const parseSymbol = (value: unknown, cardId: string, path: string, errors: ValidationError[]): SymbolInstance | null => {
+  if (isString(value)) {
+    if (!isSymbolId(value)) {
+      addError(errors, cardId, path, 'known symbol id', value);
+      return null;
+    }
+    return { id: value } as SymbolInstance;
+  }
   if (!isObject(value)) {
-    addError(errors, cardId, path, 'symbol object', value);
+    addError(errors, cardId, path, 'symbol object or string', value);
     return null;
   }
   if (!isString(value.id)) {
@@ -108,8 +57,8 @@ const parseSymbol = (value: unknown, cardId: string, path: string, errors: Valid
     addError(errors, cardId, `${path}.id`, 'known symbol id', value.id);
     return null;
   }
-  if (!validateSymbolParams(value.id, value.params)) {
-    addError(errors, cardId, `${path}.params`, `${value.id} params`, value.params);
+  if (!validateSymbolParams(value.params)) {
+    addError(errors, cardId, `${path}.params`, 'record of string | number | boolean', value.params);
     return null;
   }
   return value as SymbolInstance;
@@ -117,22 +66,21 @@ const parseSymbol = (value: unknown, cardId: string, path: string, errors: Valid
 
 const parseFrame = (value: unknown, cardId: string, index: number, errors: ValidationError[]): Frame | null => {
   if (!isObject(value)) {
-    addError(errors, cardId, `timeline[${index}]`, 'frame object', value);
+    addError(errors, cardId, `frames[${index}]`, 'frame object', value);
     return null;
   }
-  if (!isString(value.id)) {
-    addError(errors, cardId, `timeline[${index}].id`, 'string', value.id);
+  if (!isNumber(value.index)) {
+    addError(errors, cardId, `frames[${index}].index`, 'number', value.index);
   }
   if (!Array.isArray(value.symbols)) {
-    addError(errors, cardId, `timeline[${index}].symbols`, 'array', value.symbols);
+    addError(errors, cardId, `frames[${index}].symbols`, 'array', value.symbols);
     return null;
   }
   const symbols = value.symbols
-    .map((symbol, symbolIndex) => parseSymbol(symbol, cardId, `timeline[${index}].symbols[${symbolIndex}]`, errors))
+    .map((symbol, symbolIndex) => parseSymbol(symbol, cardId, `frames[${index}].symbols[${symbolIndex}]`, errors))
     .filter((symbol): symbol is SymbolInstance => symbol !== null);
-
   return {
-    id: isString(value.id) ? value.id : `frame-${index}`,
+    index: isNumber(value.index) ? value.index : index,
     symbols,
   };
 };
@@ -147,17 +95,28 @@ const parseBaseCard = (value: unknown, errors: ValidationError[]): CardBase | nu
   if (!isString(value.name)) addError(errors, cardId, 'name', 'string', value.name);
 
   const cardType = value.cardType as CardType;
-  if (!['ability', 'movement', 'rotation'].includes(cardType)) {
-    addError(errors, cardId, 'cardType', 'ability | movement | rotation', value.cardType);
+  if (!['ability', 'movement', 'rotation', 'attack', 'utility'].includes(cardType)) {
+    addError(errors, cardId, 'cardType', 'ability | movement | rotation | attack | utility', value.cardType);
   }
-  if (!isNumber(value.priority)) addError(errors, cardId, 'priority', 'number', value.priority);
-  if (!isNumber(value.rotationAllowance)) {
+  if (value.priority !== undefined && !isNumber(value.priority)) {
+    addError(errors, cardId, 'priority', 'number', value.priority);
+  }
+  if (value.rotationAllowance !== undefined && !isNumber(value.rotationAllowance)) {
     addError(errors, cardId, 'rotationAllowance', 'number', value.rotationAllowance);
   }
-  if (!Array.isArray(value.timeline)) addError(errors, cardId, 'timeline', 'array', value.timeline);
+  if (value.rotationModifier !== undefined && !isNumber(value.rotationModifier)) {
+    addError(errors, cardId, 'rotationModifier', 'number', value.rotationModifier);
+  }
+  if (value.cost !== undefined && !isNumber(value.cost)) {
+    addError(errors, cardId, 'cost', 'number', value.cost);
+  }
+  if (value.number !== undefined && !isString(value.number) && !isNumber(value.number)) {
+    addError(errors, cardId, 'number', 'string | number', value.number);
+  }
+  if (!Array.isArray(value.frames)) addError(errors, cardId, 'frames', 'array', value.frames);
 
-  const frames = Array.isArray(value.timeline)
-    ? value.timeline
+  const frames = Array.isArray(value.frames)
+    ? value.frames
         .map((frame, index) => parseFrame(frame, cardId, index, errors))
         .filter((frame): frame is Frame => frame !== null)
     : [];
@@ -166,10 +125,14 @@ const parseBaseCard = (value: unknown, errors: ValidationError[]): CardBase | nu
     id: isString(value.id) ? value.id : cardId,
     cardType: cardType ?? 'ability',
     name: isString(value.name) ? value.name : 'Unknown',
+    number: isString(value.number) || isNumber(value.number) ? `${value.number}` : undefined,
     art: isString(value.art) ? value.art : undefined,
-    priority: isNumber(value.priority) ? value.priority : 0,
-    rotationAllowance: isNumber(value.rotationAllowance) ? value.rotationAllowance : 0,
-    timeline: frames,
+    cost: isNumber(value.cost) ? value.cost : undefined,
+    priority: isNumber(value.priority) ? value.priority : undefined,
+    rotationAllowance: isNumber(value.rotationAllowance) ? value.rotationAllowance : undefined,
+    rotationModifier: isNumber(value.rotationModifier) ? value.rotationModifier : undefined,
+    frames,
+    framesCount: isNumber(value.framesCount) ? value.framesCount : undefined,
     activeText: isString(value.activeText) ? value.activeText : undefined,
     passiveText: isString(value.passiveText) ? value.passiveText : undefined,
   };
@@ -183,32 +146,21 @@ export const parseCard = (value: unknown): ValidationResult<Card> => {
   }
   const cardId = base.id;
 
-  if (base.cardType === 'ability') {
-    if (!isObject(value) || !isNumber(value.damage)) {
-      addError(errors, cardId, 'damage', 'number', isObject(value) ? value.damage : value);
-    }
-    if (!isObject(value) || !isNumber(value.knockbackFactor)) {
-      addError(errors, cardId, 'knockbackFactor', 'number', isObject(value) ? value.knockbackFactor : value);
-    }
-    if (errors.length) return { success: false, errors };
-    return {
-      success: true,
-      value: { ...base, damage: (value as { damage: number }).damage, knockbackFactor: (value as { knockbackFactor: number }).knockbackFactor },
-    };
+  const record = isObject(value) ? value : null;
+  const damage = record && isNumber(record.damage) ? record.damage : undefined;
+  const knockbackFactor = record && isNumber(record.knockbackFactor) ? record.knockbackFactor : undefined;
+  if (record && record.damage !== undefined && !isNumber(record.damage)) {
+    addError(errors, cardId, 'damage', 'number', record.damage);
+  }
+  if (record && record.knockbackFactor !== undefined && !isNumber(record.knockbackFactor)) {
+    addError(errors, cardId, 'knockbackFactor', 'number', record.knockbackFactor);
   }
 
-  if (base.cardType === 'movement' || base.cardType === 'rotation') {
-    const damage = isObject(value) && isNumber(value.damage) ? value.damage : undefined;
-    const knockbackFactor = isObject(value) && isNumber(value.knockbackFactor) ? value.knockbackFactor : undefined;
-    if (errors.length) return { success: false, errors };
-    return {
-      success: true,
-      value: { ...base, cardType: base.cardType, damage, knockbackFactor },
-    };
-  }
-
-  addError(errors, cardId, 'cardType', 'ability | movement | rotation', base.cardType);
-  return { success: false, errors };
+  if (errors.length) return { success: false, errors };
+  return {
+    success: true,
+    value: { ...base, cardType: base.cardType, damage, knockbackFactor },
+  };
 };
 
 export const parseCards = (values: unknown[]): ValidationResult<Card[]> => {

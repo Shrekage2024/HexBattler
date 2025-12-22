@@ -1,10 +1,10 @@
-import type { SymbolInstance, WithTextParams } from '@/cards/symbols';
+import type { SymbolInstance } from '@/cards/types';
 import { getSymbolMeta } from '@/cards/symbols';
 import type { IconKey } from '@/cards/symbols';
 
 const iconBase = 'h-4 w-4 text-emerald-200';
 
-const WithTextBadge = ({ kind }: { kind: 'active' | 'passive' }) => (
+const WithTextBadge = ({ kind }: { kind: string }) => (
   <span className="absolute -right-1 -top-1 rounded-full bg-slate-950/80 px-1 text-[8px] font-semibold text-emerald-200">
     {kind === 'active' ? 'A' : 'P'}
   </span>
@@ -102,13 +102,26 @@ const iconFromKey = (iconKey: IconKey) => {
   }
 };
 
-export const SymbolIcon = ({ symbol }: { symbol: SymbolInstance | { id: string; params?: unknown } }) => {
-  if (symbol.id === 'WITH_TEXT') {
-    const params = symbol.params as WithTextParams;
+type SymbolInput = SymbolInstance | string | { id: string; params?: Record<string, number | string | boolean> };
+
+export const SymbolIcon = ({ symbol }: { symbol: SymbolInput }) => {
+  if (typeof symbol === 'string') {
+    const meta = getSymbolMeta(symbol);
+    if (!meta) {
+      if (import.meta.env.DEV) {
+        console.error(`[CardDemo] Unknown symbol id "${symbol}" encountered.`);
+      }
+      return <UnknownGlyph />;
+    }
+    return iconFromKey(meta.render.icon);
+  }
+
+  if (symbol.id === 'WITH_TEXT' && symbol.params) {
+    const params = symbol.params as { inner?: SymbolInput; kind?: string };
     return (
       <div className="relative">
-        <SymbolIcon symbol={params.inner} />
-        <WithTextBadge kind={params.kind} />
+        <SymbolIcon symbol={params.inner ?? 'WAIT'} />
+        <WithTextBadge kind={params.kind ?? 'active'} />
       </div>
     );
   }
@@ -121,5 +134,5 @@ export const SymbolIcon = ({ symbol }: { symbol: SymbolInstance | { id: string; 
     return <UnknownGlyph />;
   }
 
-  return iconFromKey(meta.iconKey);
+  return iconFromKey(meta.render.icon);
 };

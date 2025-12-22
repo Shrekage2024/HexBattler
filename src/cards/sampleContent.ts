@@ -3,34 +3,29 @@ export const sampleCardData: unknown[] = [
     id: 'ability-frostline',
     cardType: 'ability',
     name: 'Frostline Lunge',
+    number: 'A-02',
     priority: 5,
     rotationAllowance: 1,
     damage: 3,
     knockbackFactor: 2,
     activeText: 'After moving, you may rotate 60 deg toward a target.',
     passiveText: 'If the attack hits, gain 1 guard.',
-    timeline: [
+    frames: [
       {
-        id: 'frostline-f1',
+        index: 1,
         symbols: [
           { id: 'MOVE', params: { direction: 'F', distance: 2 } },
           { id: 'TEXT_ACTIVE' },
         ],
       },
       {
-        id: 'frostline-f2',
-        symbols: [{ id: 'ATTACK', params: { pattern: 'frontArc' } }],
+        index: 2,
+        symbols: [{ id: 'ATTACK', params: { power: 2 } }],
       },
       {
-        id: 'frostline-f3',
+        index: 3,
         symbols: [
-          {
-            id: 'WITH_TEXT',
-            params: {
-              kind: 'passive',
-              inner: { id: 'BLOCK', params: { edge: 'F' } },
-            },
-          },
+          { id: 'WITH_TEXT', params: { inner: 'BLOCK', kind: 'passive' } },
           { id: 'TEXT_PASSIVE' },
         ],
       },
@@ -40,48 +35,47 @@ export const sampleCardData: unknown[] = [
     id: 'movement-veilstep',
     cardType: 'movement',
     name: 'Veil Step',
+    number: 'M-04',
     priority: 3,
     rotationAllowance: 2,
     activeText: 'If you jump over a foe, draw a card.',
-    timeline: [
+    frames: [
       {
-        id: 'veil-f1',
+        index: 1,
         symbols: [
           { id: 'JUMP', params: { direction: 'FR', distance: 1 } },
           { id: 'MOVE', params: { direction: 'F', distance: 1 } },
         ],
       },
       {
-        id: 'veil-f2',
+        index: 2,
         symbols: [{ id: 'WAIT' }],
       },
       {
-        id: 'veil-f3',
+        index: 3,
         symbols: [{ id: 'TEXT_ACTIVE' }],
       },
     ],
   },
   {
-    id: 'rotation-pivot',
-    cardType: 'rotation',
+    id: 'attack-pivot',
+    cardType: 'attack',
     name: 'Pivot Spiral',
+    number: 'AT-07',
     priority: 2,
     rotationAllowance: 2,
     passiveText: 'Rotate freely while concentrated.',
-    timeline: [
+    frames: [
       {
-        id: 'pivot-f1',
-        symbols: [
-          { id: 'CONCENTRATION' },
-          { id: 'COMBO' },
-        ],
+        index: 1,
+        symbols: [{ id: 'CONCENTRATION' }, { id: 'COMBO' }],
       },
       {
-        id: 'pivot-f2',
-        symbols: [{ id: 'CHARGE', params: { pattern: 'adjacent' } }],
+        index: 2,
+        symbols: [{ id: 'CHARGE', params: { power: 1 } }],
       },
       {
-        id: 'pivot-f3',
+        index: 3,
         symbols: [{ id: 'REFRESH' }],
       },
     ],

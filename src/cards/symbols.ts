@@ -1,39 +1,4 @@
-export type Direction = 'F' | 'FL' | 'FR' | 'B' | 'BL' | 'BR';
-export type AttackPattern = 'frontArc' | 'adjacent' | 'custom';
-
-export type MoveParams = {
-  direction: Direction;
-  distance: number;
-};
-
-export type AttackParams = {
-  pattern: AttackPattern;
-  offsets?: Array<{ q: number; r: number }>;
-};
-
-export type BlockParams = {
-  edge: Direction;
-};
-
-export type WithTextParams = {
-  kind: 'active' | 'passive';
-  inner: SymbolInstanceBase;
-};
-
-export type SymbolParamsMap = {
-  WAIT: undefined;
-  TEXT_ACTIVE: undefined;
-  TEXT_PASSIVE: undefined;
-  WITH_TEXT: WithTextParams;
-  MOVE: MoveParams;
-  JUMP: MoveParams;
-  ATTACK: AttackParams;
-  CHARGE: AttackParams;
-  BLOCK: BlockParams;
-  CONCENTRATION: undefined;
-  COMBO: undefined;
-  REFRESH: undefined;
-};
+export type SymbolCategory = 'movement' | 'attack' | 'state' | 'meta';
 
 export type IconKey =
   | 'wait'
@@ -49,117 +14,92 @@ export type IconKey =
   | 'refresh'
   | 'unknown';
 
-export type SymbolRenderMode = 'standard' | 'textMarker' | 'withText';
+export type SymbolRender = {
+  icon: IconKey;
+  color: string;
+  badge?: string;
+};
 
 export type SymbolMetaDefinition = {
   label: string;
-  description: string;
-  category: 'action' | 'text' | 'utility';
-  iconKey: IconKey;
-  renderMode: SymbolRenderMode;
+  category: SymbolCategory;
+  render: SymbolRender;
+  engineHints?: {
+    directional?: boolean;
+    consumesFrame?: boolean;
+  };
 };
 
 export const symbolRegistry = {
   WAIT: {
     label: 'Wait',
-    description: 'Do nothing this frame.',
-    category: 'action',
-    iconKey: 'wait',
-    renderMode: 'standard',
+    category: 'state',
+    render: { icon: 'wait', color: 'emerald' },
   },
   TEXT_ACTIVE: {
     label: 'Active Text',
-    description: 'Read the active text for this frame.',
-    category: 'text',
-    iconKey: 'textActive',
-    renderMode: 'textMarker',
+    category: 'meta',
+    render: { icon: 'textActive', color: 'emerald', badge: 'A' },
   },
   TEXT_PASSIVE: {
     label: 'Passive Text',
-    description: 'Read the passive text for this frame.',
-    category: 'text',
-    iconKey: 'textPassive',
-    renderMode: 'textMarker',
+    category: 'meta',
+    render: { icon: 'textPassive', color: 'indigo', badge: 'P' },
   },
   WITH_TEXT: {
     label: 'Text Behind',
-    description: 'Symbol resolves alongside its text marker.',
-    category: 'text',
-    iconKey: 'unknown',
-    renderMode: 'withText',
+    category: 'meta',
+    render: { icon: 'unknown', color: 'slate' },
+    engineHints: { consumesFrame: false },
   },
   MOVE: {
     label: 'Move',
-    description: 'Move relative to facing.',
-    category: 'action',
-    iconKey: 'move',
-    renderMode: 'standard',
+    category: 'movement',
+    render: { icon: 'move', color: 'emerald' },
+    engineHints: { directional: true },
   },
   JUMP: {
     label: 'Jump',
-    description: 'Jump ignoring blocking.',
-    category: 'action',
-    iconKey: 'jump',
-    renderMode: 'standard',
+    category: 'movement',
+    render: { icon: 'jump', color: 'emerald' },
+    engineHints: { directional: true },
   },
   ATTACK: {
     label: 'Attack',
-    description: 'Attack using a pattern.',
-    category: 'action',
-    iconKey: 'attack',
-    renderMode: 'standard',
+    category: 'attack',
+    render: { icon: 'attack', color: 'rose' },
+    engineHints: { directional: true },
   },
   CHARGE: {
     label: 'Charge',
-    description: 'Attack then move into the target hex.',
-    category: 'action',
-    iconKey: 'charge',
-    renderMode: 'standard',
+    category: 'attack',
+    render: { icon: 'charge', color: 'amber' },
+    engineHints: { directional: true },
   },
   BLOCK: {
     label: 'Block',
-    description: 'Block attacks from an edge.',
-    category: 'utility',
-    iconKey: 'block',
-    renderMode: 'standard',
+    category: 'state',
+    render: { icon: 'block', color: 'indigo' },
+    engineHints: { directional: true },
   },
   CONCENTRATION: {
     label: 'Concentration',
-    description: 'Move card to concentration area.',
-    category: 'utility',
-    iconKey: 'concentration',
-    renderMode: 'standard',
+    category: 'state',
+    render: { icon: 'concentration', color: 'emerald' },
   },
   COMBO: {
     label: 'Combo',
-    description: 'Optional chain into another combo card.',
-    category: 'utility',
-    iconKey: 'combo',
-    renderMode: 'standard',
+    category: 'meta',
+    render: { icon: 'combo', color: 'indigo' },
   },
   REFRESH: {
     label: 'Refresh',
-    description: 'Refresh if on land.',
-    category: 'utility',
-    iconKey: 'refresh',
-    renderMode: 'standard',
+    category: 'state',
+    render: { icon: 'refresh', color: 'emerald' },
   },
 } as const satisfies Record<string, SymbolMetaDefinition>;
 
 export type SymbolId = keyof typeof symbolRegistry;
-
-export type BaseSymbolId = Exclude<SymbolId, 'WITH_TEXT'>;
-
-export type SymbolInstanceBase = {
-  [K in BaseSymbolId]: SymbolParamsMap[K] extends undefined ? { id: K } : { id: K; params: SymbolParamsMap[K] };
-}[BaseSymbolId];
-
-export type SymbolInstance =
-  | SymbolInstanceBase
-  | {
-      id: 'WITH_TEXT';
-      params: SymbolParamsMap['WITH_TEXT'];
-    };
 
 export type SymbolMeta = SymbolMetaDefinition & { id: SymbolId };
 
