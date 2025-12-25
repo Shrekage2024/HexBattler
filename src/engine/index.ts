@@ -114,3 +114,12 @@ export const applyMove = ({
   position: destination,
   facing,
 });
+
+export { createRulesEngine } from './rulesEngine';
+export { createReducer } from './reducer';
+export { createResolver } from './resolver';
+export { createPreviewEngine } from './previewEngine';
+export type { RulesEngine } from './rulesEngine';
+export type { GameReducer } from './reducer';
+export type { Resolver } from './resolver';
+export type { PreviewEngine, Preview } from './previewEngine';

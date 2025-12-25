@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import type { Axial } from '@/lib/geometry';
-import { axialKey, makeHexagonDisk } from '@/lib/geometry';
+import { makeHexagonDisk } from '@/lib/geometry';
 import { HexBoard } from './HexBoard';
 
 interface HexBoardPanelProps {
   radius?: number;
+  highlightedCells?: Set<string>;
+  onSelectedCellChange?: (cell: Axial | null) => void;
 }
 
 const axialDistance = (a: Axial, b: Axial) => {
@@ -14,7 +16,7 @@ const axialDistance = (a: Axial, b: Axial) => {
   return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds));
 };
 
-export const HexBoardPanel = ({ radius = 3 }: HexBoardPanelProps) => {
+export const HexBoardPanel = ({ radius = 3, highlightedCells, onSelectedCellChange }: HexBoardPanelProps) => {
   const [selectedCell, setSelectedCell] = useState<Axial | null>(null);
 
   const hexes = useMemo(() => makeHexagonDisk(radius), [radius]);
@@ -26,14 +28,10 @@ export const HexBoardPanel = ({ radius = 3 }: HexBoardPanelProps) => {
     return hexes.filter((cell) => axialDistance(cell, center) <= 1);
   }, [hexes, center]);
 
-  const highlightedCells = useMemo(() => {
-    if (!selectedCell) return new Set<string>();
-    return new Set(
-      hexes
-        .filter((cell) => axialDistance(cell, selectedCell) === 1)
-        .map((cell) => axialKey(cell))
-    );
-  }, [hexes, selectedCell]);
+  const handleSelectCell = (cell: Axial) => {
+    setSelectedCell(cell);
+    onSelectedCellChange?.(cell);
+  };
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40 p-4 shadow-lg backdrop-blur">
@@ -55,7 +53,7 @@ export const HexBoardPanel = ({ radius = 3 }: HexBoardPanelProps) => {
           highlightedHexes={coreCells}
           selectedCell={selectedCell}
           highlightedCells={highlightedCells}
-          onCellClick={setSelectedCell}
+          onCellClick={handleSelectCell}
         />
       </div>
 

@@ -1,35 +1,39 @@
-import { HexBoardPanel } from '@/components/HexBoardPanel';
+import { useMemo, useState } from 'react';
+import { sampleCardData } from '@/cards/sampleContent';
+import { parseCards } from '@/cards/schema';
+import type { Card } from '@/cards/types';
+import { GameTableLayout } from '@/components/GameTable/GameTableLayout';
+import { previewEngine } from '@/app/engine';
+import type { Axial } from '@/lib/geometry';
 
 export const GamePage = () => {
+  const parsedCards = parseCards(sampleCardData);
+  const playerHand = parsedCards.success ? parsedCards.value : [];
+  const defaultCardId = playerHand[0]?.id ?? '';
+  const [selectedCardId, setSelectedCardId] = useState<string>(defaultCardId);
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null);
+  const [selectedCell, setSelectedCell] = useState<Axial | null>(null);
+  if (!parsedCards.success && import.meta.env.DEV) {
+    console.warn('[GameTable] Sample card data failed validation.');
+  }
+
+  const previewHighlightedCells = useMemo(() => {
+    return previewEngine.getPreview({ selectedHex: selectedCell, selectedFrameIndex }).highlighted;
+  }, [selectedCell, selectedFrameIndex]);
+
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-7xl p-6">
-        {/* Header */}
-        <header className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-              Hexstrike Prototype
-            </p>
-            <h1 className="text-2xl font-semibold text-white">
-              Game Table
-            </h1>
-          </div>
-
-          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-slate-200">
-            Planning Phase
-          </div>
-        </header>
-
-        {/* Board */}
-        <section className="flex items-center justify-center">
-          <HexBoardPanel radius={4} />
-        </section>
-
-        {/* Footer placeholder */}
-        <footer className="mt-6 text-center text-xs text-slate-400">
-          Card execution UI coming next
-        </footer>
-      </div>
-    </main>
+    <GameTableLayout
+      opponentHandCount={5}
+      playerHand={playerHand as Card[]}
+      selectedCardId={selectedCardId}
+      onSelectCard={(id) => {
+        setSelectedCardId(id);
+        setSelectedFrameIndex(null);
+      }}
+      selectedFrameIndex={selectedFrameIndex}
+      onSelectFrame={setSelectedFrameIndex}
+      highlightedCells={previewHighlightedCells}
+      onSelectedCellChange={setSelectedCell}
+    />
   );
 };
