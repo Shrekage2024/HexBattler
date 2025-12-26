@@ -2,6 +2,7 @@ export * from './ids';
 export * from './hex';
 export * from './primitives';
 export * from './cards';
+export * from './program';
 export * from './state';
 export * from './intent';
 export * from './events';

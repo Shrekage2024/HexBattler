@@ -1,5 +1,6 @@
 import type { CardId, CharacterId, PlayerId } from './ids';
 import type { Axial } from './hex';
+import type { PlannedProgram, ResolvedFrameStep } from './program';
 
 export type Phase = 'setup' | 'planning' | 'reveal' | 'resolve' | 'complete';
 
@@ -27,6 +28,14 @@ export interface PlayerState {
   characters: CharacterId[];
 }
 
+export interface RoundState {
+  status: 'PLANNING' | 'RESOLVING' | 'COMPLETE';
+  frameIndex: number;
+  order: PlayerId[];
+  lastResolvedFrameIndex?: number;
+  lastResolvedSteps?: ResolvedFrameStep[];
+}
+
 export interface GameState {
   id: string;
   phase: Phase;
@@ -35,6 +44,8 @@ export interface GameState {
   characters: CharacterState[];
   abilityDeck: AbilityDeckState;
   movement?: MovementState;
+  programsByPlayer?: Record<PlayerId, PlannedProgram>;
+  round?: RoundState;
   selection?: {
     selectedHex?: Axial | null;
     selectedCardId?: CardId | null;
