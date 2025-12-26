@@ -10,6 +10,7 @@ export interface SymbolInstance {
 
 export interface Frame {
   id: string;
+  index: number;
   symbols: SymbolInstance[];
 }
 
