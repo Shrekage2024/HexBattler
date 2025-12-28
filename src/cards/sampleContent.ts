@@ -58,6 +58,24 @@ export const sampleCardData: unknown[] = [
     ],
   },
   {
+    id: 'R-01',
+    cardType: 'rotation',
+    name: 'Center Pivot',
+    number: 'R-01',
+    priority: 1,
+    rotationAllowance: 2,
+    frames: [
+      {
+        index: 1,
+        symbols: [{ id: 'WAIT' }],
+      },
+      {
+        index: 2,
+        symbols: [{ id: 'REFRESH' }],
+      },
+    ],
+  },
+  {
     id: 'attack-pivot',
     cardType: 'attack',
     name: 'Pivot Spiral',

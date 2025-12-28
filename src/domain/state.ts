@@ -29,11 +29,20 @@ export interface PlayerState {
 }
 
 export interface RoundState {
-  status: 'PLANNING' | 'RESOLVING' | 'COMPLETE';
+  status: 'planning' | 'resolving' | 'ended';
   frameIndex: number;
   order: PlayerId[];
-  lastResolvedFrameIndex?: number;
-  lastResolvedSteps?: ResolvedFrameStep[];
+  resolvedSteps?: ResolvedFrameStep[];
+  activeStep?: { playerId: PlayerId; frameIndex: number } | null;
+  stepCursor?: number;
+}
+
+export interface ResolutionLogEntry {
+  type: string;
+  frameIndex: number;
+  playerId: PlayerId;
+  symbolIds: string[];
+  ts: number;
 }
 
 export interface GameState {
@@ -44,8 +53,9 @@ export interface GameState {
   characters: CharacterState[];
   abilityDeck: AbilityDeckState;
   movement?: MovementState;
-  programsByPlayer?: Record<PlayerId, PlannedProgram>;
+  programsByPlayer?: Record<PlayerId, PlannedProgram | undefined>;
   round?: RoundState;
+  log: ResolutionLogEntry[];
   selection?: {
     selectedHex?: Axial | null;
     selectedCardId?: CardId | null;
