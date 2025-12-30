@@ -7,6 +7,18 @@ HexStrike is a playable prototype for a 2–4 player online hex board game built
 - `npm run build` – typecheck and build for production
 - `npm run preview` – preview the production build locally
 
+## Lobby server (Socket.IO)
+Run the lobby server alongside the Vite app:
+```
+cd server
+npm install
+npm run dev
+```
+In a second terminal from the repo root:
+```
+npm run dev
+```
+
 ## Environment
 Create a `.env.local` file with your Firebase config values:
 ```
